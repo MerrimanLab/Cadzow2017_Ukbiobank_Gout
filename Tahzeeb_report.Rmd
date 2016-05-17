@@ -1,0 +1,807 @@
+---
+title: "UkBioBank Gout Summary Report"
+author: "Murray Cadzow"
+date: '`r format(Sys.Date())`'
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+\listoftables
+
+```{r load data,echo = FALSE}
+library(dplyr)
+library(ggplot2)
+library(pander)
+load('~/ukbiobank_gout_bd_refined.RData')
+
+# parallel "grep 'CHR\|rs3827103\|rs17700633\|rs17782313\|rs3815574' {}/results/BMI_Adjusted/gout{}1_chr{2,18,20}.assoc.logistic | grep -v ' SEX\| BMI' | sed 's/ \+/\t/g' | cut -f 2- | sort -r| uniq > {}_tahzeeb.txt " ::: all hosp self self_ult winnard
+
+
+all_fam <- read.table("/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/controls_d/all/chrallimpv1.fam_goutall1", header=FALSE)
+colnames(all_fam) <- c("FID","IID","PID","MID", "SEX","AFF")
+bd_refined_gout$fam_all1 <- NA
+bd_refined_gout[bd_refined_gout$f.eid %in% all_fam$IID & 
+                  bd_refined_gout$f.eid %in% all_fam[which(all_fam$AFF==1 | all_fam$AFF == 2),"IID"], "fam_all1"] <-1
+
+bd_refined_gout$fam <- NA
+bd_refined_gout[bd_refined_gout$f.eid %in% all_fam$IID,"fam"] <- 1
+
+self_fam  <- read.table("/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/controls_d/self/chrallimpv1.fam_goutself1", header=FALSE)
+colnames(self_fam) <- c("FID","IID","PID","MID", "SEX","AFF")
+bd_refined_gout$fam_self1 <- NA
+bd_refined_gout[bd_refined_gout$f.eid %in% self_fam$IID & 
+                  bd_refined_gout$f.eid %in% self_fam[which(self_fam$AFF==1 | self_fam$AFF == 2),"IID"], "fam_self1"] <-1
+
+self_ult_fam <- read.table("/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/controls_d/self_ult/chrallimpv1.fam_goutself_ult1", header=FALSE)
+colnames(self_ult_fam) <- c("FID","IID","PID","MID", "SEX","AFF")
+bd_refined_gout$fam_self_ult1 <- NA
+bd_refined_gout[bd_refined_gout$f.eid %in% self_ult_fam$IID & 
+                  bd_refined_gout$f.eid %in% self_ult_fam[which(self_ult_fam$AFF==1 | self_ult_fam$AFF == 2),"IID"], "fam_self_ult1"] <-1
+
+winnard_fam  <- read.table("/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/controls_d/winnard/chrallimpv1.fam_goutwinnard1", header=FALSE)
+colnames(winnard_fam) <- c("FID","IID","PID","MID", "SEX","AFF")
+bd_refined_gout$fam_winnard1 <- NA
+bd_refined_gout[bd_refined_gout$f.eid %in% winnard_fam$IID & 
+                  bd_refined_gout$f.eid %in% winnard_fam[which(winnard_fam$AFF==1 | winnard_fam$AFF == 2),"IID"], "fam_winnard1"] <-1
+
+hosp_fam  <- read.table("/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/controls_d/hosp/chrallimpv1.fam_gouthosp1", header=FALSE)
+colnames(hosp_fam)  <- c("FID","IID","PID","MID", "SEX","AFF")
+bd_refined_gout$fam_hosp1 <- NA
+bd_refined_gout[bd_refined_gout$f.eid %in% hosp_fam$IID & 
+                  bd_refined_gout$f.eid %in% hosp_fam[which(hosp_fam$AFF==1 | hosp_fam$AFF == 2),"IID"], "fam_hosp1"] <-1
+```
+
+```{r total_summary, echo=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+gout_tally <-  data.frame(
+  total = as.numeric(length(bd_refined_gout$f.eid)),
+  totalaff = as.numeric(bd_refined_gout   %>% filter(goutaff == 1 | goutaff == 0)  %>% select(goutaff) %>% tally()),
+  totalgout = as.numeric(bd_refined_gout  %>%   filter(goutaff == 1)  %>%  select(goutaff)  %>% tally()),
+  totalcontrol = as.numeric(bd_refined_gout  %>%   filter(goutaff == 0)  %>%  select(goutaff)  %>%tally()),
+  self = as.numeric(bd_refined_gout  %>%   filter(goutself == 1)  %>%  select(goutaff)  %>%tally()),
+  winnard_self = as.numeric(bd_refined_gout  %>%   filter(gout_winnard_self == 1)  %>%  select(goutaff)  %>%tally()),
+  hosp = as.numeric(bd_refined_gout  %>%   filter(gouthosp == 1)  %>%  select(goutaff)  %>%tally()),
+  winnard = as.numeric(bd_refined_gout  %>%   filter(goutwinnard == 1)  %>% select(goutaff)  %>% tally()),
+  ult = as.numeric(bd_refined_gout  %>%   filter(goutult == 1)  %>% select(goutaff)  %>% tally()),
+  drug = as.numeric(bd_refined_gout  %>%   filter(goutdrug == 1)  %>% select(goutaff)  %>% tally()),
+  self_ult = as.numeric(bd_refined_gout  %>%   filter(gout_self_ult == 1)  %>% select(goutaff)  %>% tally())
+)
+
+sex_summary <- data.frame(
+  total = as.data.frame(bd_refined_gout %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  totalaff = as.data.frame(bd_refined_gout %>% filter(goutaff == 1 | goutaff == 0)  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  totalgout = as.data.frame(bd_refined_gout %>% filter(goutaff == 1)  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  totalcontrol = as.data.frame(bd_refined_gout %>% filter(goutaff == 0)  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  self = as.data.frame(bd_refined_gout %>% filter(goutself == 1)  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  winnard = as.data.frame(bd_refined_gout %>% filter(goutwinnard == 1)  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  winnard_self = as.data.frame(bd_refined_gout %>% filter(gout_winnard_self == 1)  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  hosp = as.data.frame(bd_refined_gout %>% filter(gouthosp == 1 )  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  ult = as.data.frame(bd_refined_gout %>% filter(goutult== 1 )  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  drug = as.data.frame(bd_refined_gout %>% filter(goutdrug == 1 )  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2],
+  self_ult = as.data.frame(bd_refined_gout %>% filter(gout_self_ult == 1)  %>% select(f.31.0.0) %>% group_by(f.31.0.0) %>% tally())[,2]
+)
+rownames(sex_summary) <- c("Female","Male")
+```
+\pagebreak
+
+
+
+
+
+# Genotyped
+
+There are a total of ```r as.character(bd_refined_gout %>% select(fam)  %>% filter(fam == 1) %>% tally())``` people with genotypes
+
+The GWAS were limited to only British, Irish, and "any other white background" ethnicities because there were only ```r as.data.frame(bd_refined_gout  %>% filter(!is.na(goutaff) & !(f.21000.0.0 %in% c(1001,1002,1003)) & f.eid %in% all_fam$IID)  %>%  select(f.21000.0.0, goutaff)  %>% group_by(goutaff, f.21000.0.0)  %>%  tally()  %>% summarise(sum(n)))[2,2]``` gout cases from all other ethnicities with genotypes
+
+
+### Excluded
+
+There were a total of ```r as.character(bd_refined_gout %>% filter((gout_exclude_drug == 1 | control_exclude == 1 | renaldisease == 1) & f.eid %in% all_fam$IID) %>% select(f.eid) %>% tally())``` people excluded
+
+```r as.numeric(bd_refined_gout  %>%  filter(renaldisease == 1 & f.eid %in% all_fam$IID)  %>% select(f.eid)  %>% tally())``` people had renal disease
+
+
+Controls:
+
+- ```r as.character(bd_refined_gout %>% filter(control_exclude == 1 & f.eid %in% all_fam$IID) %>% select(f.eid) %>%  tally())``` people excluded because they were on ULT, colchicine, probenecid, corticosteriodal prenisone, or NSAIDs
+
+
+
+
+
+```{r all_gwas_stats, echo = FALSE}
+all_tally <- data.frame(
+  cases = as.numeric(bd_refined_gout  %>% filter(fam_all1 == 1 & goutaff == 1) %>% select(f.eid, fam_all1, goutall, goutaff) %>% tally()),
+  controls =as.numeric(bd_refined_gout  %>% filter(fam_all1 == 1 & goutaff == 0) %>% select(f.eid) %>% tally())
+)
+
+all_drug_tally <- data.frame(
+  allopurinol = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_all1 == 1)  %>% select(f.eid) %>% tally()),
+  allopurinol_controls = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_all1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  febuxostat = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_all1 == 1)  %>% select(f.eid) %>% tally()),
+  febuxostat_controls = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_all1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  colchicine = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_all1 == 1)  %>% select(f.eid) %>% tally()),
+  colchicine_controls = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_all1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_all1 == 1)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone_controls = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_all1 == 1, goutaff == 0)  %>% select(f.eid) %>% tally()),
+  colchicine_alone = as.numeric(bd_refined_gout  %>% 
+                                  filter(fam_all1 == 1 & colchicine ==1 & !(allopurinol == 1 | sulphinpyrazone == 1 | febuxostat == 1))  %>% 
+                                  select(f.eid) %>% tally()),
+  colchicine_alone_controls = as.numeric(bd_refined_gout  %>% 
+                                  filter(goutaff == 0 & fam_all1 == 1 & colchicine ==1 & !(allopurinol == 1 | sulphinpyrazone == 1 | febuxostat == 1))  %>% 
+                                  select(f.eid) %>% tally()),
+  diuretics = as.numeric(bd_refined_gout  %>% filter(fam_all1 == 1 & diuretics == 1)  %>% select(f.eid) %>% tally()),
+  diuretics_controls = as.numeric(bd_refined_gout  %>% filter(fam_all1 == 1 & diuretics == 1 & goutaff == 0)  %>% select(f.eid) %>% tally())
+)
+```
+
+## All
+
+For the GWAS based on all gout criteria there were ```r all_tally[,"cases"]``` cases and ```r all_tally[,"controls"]``` controls, for a total sample size of ```r sum(all_tally[,c("cases","controls")])```
+
+There were:
+
+- ```r as.character(all_drug_tally[, "diuretics"])``` people on diuretics, ```r all_drug_tally[,"diuretics_controls"]``` were controls
+
+- ```r all_drug_tally[,"allopurinol"]``` people taking allopurinol, ```r all_drug_tally[,"allopurinol_controls"]``` were controls
+
+- ```r all_drug_tally[,"febuxostat"]``` people taking febuxostat, ```r all_drug_tally[,"febuxostat_controls"]``` were controls
+
+- ```r all_drug_tally[, "sulphinpyrazone"]``` people taking sulphinpyrazone, ```r all_drug_tally[,"sulphinpyrazone_controls"]``` were controls
+
+- ```r all_drug_tally[,"colchicine"]``` people taking cochicine, ```r all_drug_tally[,"colchicine_controls"]``` were controls
+
+Age summary
+
+```{r all_age_summary, echo = FALSE}
+as.data.frame(bd_refined_gout  %>% 
+  select(fam_all1, goutaff, f.21003.0.0 , f.31.0.0) %>% 
+  filter(fam_all1 == 1, !is.na(goutaff), !is.na(f.21003.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc) %>% 
+  summarise(mean = mean(f.21003.0.0), sd = sd(f.21003.0.0), min = min(f.21003.0.0),median = median(f.21003.0.0), max = max(f.21003.0.0) ), row.names = NULL)
+```
+
+Sex summary
+
+```{r all_gwas_sex_plot, echo = FALSE}
+bd_refined_gout  %>% 
+  select(goutaff, f.31.0.0, fam_all1) %>% 
+  filter(!is.na(goutaff), fam_all1 == 1 ) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc, sex)  %>% tally()  %>% 
+  ggplot(., aes(x = sex, y = n)) + 
+  geom_bar(aes(fill =sex), stat = 'identity') +
+  geom_text(aes(label=n), vjust=-0.3, color="black",
+            position = position_dodge(0.9), size=3.5)+
+  facet_wrap(~cc) +
+  theme_bw() + 
+  theme(legend.position = "none") + 
+  ggtitle("All Sex Distribution")
+```
+
+```{r all_gwas_bmi_plot, echo=FALSE, message=FALSE, warning=FALSE}
+bd_refined_gout  %>% 
+  select(fam_all1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+  filter(fam_all1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  ggplot(., aes(x = cc, y = f.21001.0.0)) + 
+  geom_boxplot() + xlab("Gout Affection") + 
+  ylab("BMI") + 
+  theme_bw() + 
+  facet_wrap(~sex) +
+  ggtitle("All Gout Criteria")
+```
+
+BMI Summary:
+
+```{r, echo = FALSE, results= 'asis'}
+pandoc.table(as.data.frame(bd_refined_gout  %>% 
+  select(fam_all1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+  filter(fam_all1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc) %>% 
+  summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0), min = min(f.21001.0.0),median = median(f.21001.0.0), max = max(f.21001.0.0) ), row.names = NULL), caption = "BMI Summary - All")
+```
+
+
+### All summary table
+
+```{r all_summary_table, echo = FALSE}
+all_age <- as.data.frame(bd_refined_gout  %>% 
+                           select(fam_all1, goutaff, f.21003.0.0 , f.31.0.0) %>% 
+                           filter(fam_all1 == 1, !is.na(goutaff), !is.na(f.21003.0.0)) %>% 
+                           mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                           group_by(cc) %>% 
+                           summarise(mean = mean(f.21003.0.0), sd = sd(f.21003.0.0)))
+
+all_bmi <-as.data.frame(bd_refined_gout  %>% 
+                          select(fam_all1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+                          filter(fam_all1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+                          mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                          group_by(cc) %>% 
+                          summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0) ))
+
+all_sex <- as.data.frame(bd_refined_gout  %>% 
+                           select(goutaff, f.31.0.0, fam_all1) %>% 
+                           filter(!is.na(goutaff), fam_all1 == 1 ) %>% 
+                           mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                           group_by(cc, sex)  %>% tally())
+all_eth_codes <- as.numeric(levels(as.factor(bd_refined_gout[!is.na(bd_refined_gout$fam_all1) & !is.na(bd_refined_gout$goutaff), "f.21000.0.0" ])))
+all_eth_case <- sapply(all_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_all1) & bd_refined_gout$goutaff == 1 & bd_refined_gout$f.21000.0.0 == x, ])})
+
+all_eth_control <- sapply(all_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_all1) & bd_refined_gout$goutaff == 0 & bd_refined_gout$f.21000.0.0 == x,  ])})
+
+a <- data.frame(
+  # case = [,1], control = [,2]
+  n = c(all_tally[,"cases"], all_tally[,"controls"]),
+  Sex = c(round(all_sex[2,"n"]/ sum(all_sex[1:2, "n"]), digits = 2), round(all_sex[4,"n"]/ sum(all_sex[3:4, "n"]), digits = 2)),
+  Age = c(paste(round(all_age[1,2],digits =2), "+/-", round(all_age[1,3], digits = 2) , sep = " ") , paste(round(all_age[2,2],digits =2), "+/-", round(all_age[2,3], digits = 2) , sep = " ")),
+  Ethnicity = c(paste(all_eth_case, collapse = " "), paste(all_eth_control, collapse = " ")),
+  Diuretics = c(all_drug_tally[,"diuretics"] - all_drug_tally[,"diuretics_controls"], all_drug_tally[,"diuretics_controls"]),
+  Allopurinol = c(all_drug_tally[,"allopurinol"]- all_drug_tally[,"allopurinol_controls"], all_drug_tally[,"allopurinol_controls"]),
+  Febuxostat = c(all_drug_tally[,"febuxostat"] -all_drug_tally[,"febuxostat_controls"], all_drug_tally[,"febuxostat_controls"]),
+  Sulphinpyrazone = c(all_drug_tally[,"sulphinpyrazone"] -all_drug_tally[,"sulphinpyrazone_controls"], all_drug_tally[,"sulphinpyrazone_controls"]),
+  Colchicine = c(all_drug_tally[,"colchicine"] -all_drug_tally[,"colchicine_controls"] , all_drug_tally[,"colchicine_controls"]),
+  BMI = c(paste(round(all_bmi[1,2],digits =2), "+/-", round(all_bmi[1,3], digits = 2) , sep = " ") , paste(round(all_bmi[2,2],digits =2), "+/-", round(all_bmi[2,3], digits = 2) , sep = " "))
+)
+
+rownames(a) <-c("Gout", "Control")
+t(a)
+rm(a, all_age, all_sex)
+```
+Sex as % male  
+Age and BMI given as mean +/- sd  
+Ethnicity in order British, Irish, and Any other white background
+
+
+
+\pagebreak
+
+```{r winnard_gwas_stats, echo = FALSE}
+winnard_tally <- data.frame(
+  cases = as.numeric(bd_refined_gout  %>% filter(fam_winnard1 == 1 & goutaff == 1) %>% select(f.eid, fam_winnard1, goutwinnard, goutaff) %>% tally()),
+  controls =as.numeric(bd_refined_gout  %>% filter(fam_winnard1 == 1 & goutaff == 0) %>% select(f.eid) %>% tally())
+)
+
+winnard_drug_tally <- data.frame(
+  allopurinol = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_winnard1 == 1)  %>% select(f.eid) %>% tally()),
+  allopurinol_controls = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_winnard1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  febuxostat = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_winnard1 == 1)  %>% select(f.eid) %>% tally()),
+  febuxostat_controls = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_winnard1 == 1 & goutaff== 0)  %>% select(f.eid) %>% tally()),
+  colchicine = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_winnard1 == 1)  %>% select(f.eid) %>% tally()),
+  colchicine_controls = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_winnard1 == 1 & goutaff ==0)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_winnard1 == 1)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone_controls = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_winnard1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  colchicine_alone = as.numeric(bd_refined_gout  %>% 
+                                  filter(fam_winnard1 == 1 & colchicine ==1 & !(allopurinol == 1 | sulphinpyrazone == 1 | febuxostat == 1))  %>% 
+                                  select(f.eid) %>% tally()),
+  diuretics = as.numeric(bd_refined_gout  %>% filter(fam_winnard1 == 1 & diuretics == 1)  %>% select(f.eid) %>% tally()),
+  diuretics_controls = as.numeric(bd_refined_gout  %>% filter(fam_winnard1 == 1 & diuretics == 1 & goutaff == 0)  %>% select(f.eid) %>% tally())
+)
+```
+
+
+## Winnard
+
+For the GWAS based on the Winnard et al gout criteria there were ```r winnard_tally[,"cases"]``` cases and ```r as.character(winnard_tally[,"controls"])``` controls, for a total sample size of ```r as.character(sum(winnard_tally[,c("cases","controls")]))```
+
+There were:
+
+- ```r as.character(winnard_drug_tally[, "diuretics"])``` people on diuretics
+
+- ```r winnard_drug_tally[,"allopurinol"]``` people taking allopurinol
+
+- ```r winnard_drug_tally[,"febuxostat"]``` people taking febuxostat
+
+- ```r winnard_drug_tally[, "sulphinpyrazone"]``` people taking sulphinpyrazone
+
+- ```r winnard_drug_tally[,"colchicine"]``` people taking cochicine
+
+
+
+```{r winnard_gwas_sex_plot, echo = FALSE}
+bd_refined_gout  %>% 
+  select(goutaff, f.31.0.0, fam_winnard1) %>% 
+  filter(!is.na(goutaff), fam_winnard1 == 1 ) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc, sex)  %>% tally()  %>% 
+  ggplot(., aes(x = sex, y = n)) + 
+  geom_bar(aes(fill =sex), stat = 'identity') +
+  geom_text(aes(label=n), vjust=-0.3, color="black",
+            position = position_dodge(0.9), size=3.5)+
+  facet_wrap(~cc) +
+  theme_bw() + 
+  theme(legend.position = "none") + 
+  ggtitle("Winnard Sex Distribution")
+```
+
+```{r winnard_gwas_bmi_plot, echo=FALSE, message=FALSE, warning=FALSE}
+bd_refined_gout  %>% 
+  select(fam_winnard1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+  filter(fam_winnard1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  ggplot(., aes(x = cc, y = f.21001.0.0)) + 
+  geom_boxplot() + xlab("Gout Affection") + 
+  ylab("BMI") + 
+  theme_bw() + 
+  facet_wrap(~sex) +
+  ggtitle("Winnard Gout Criteria")
+```
+
+BMI Summary:
+
+```{r, echo = FALSE}
+as.data.frame(bd_refined_gout  %>% 
+  select(fam_winnard1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+  filter(fam_winnard1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc,sex) %>% 
+  summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0), min = min(f.21001.0.0),median = median(f.21001.0.0), max = max(f.21001.0.0) ), row.names = NULL)
+```
+
+
+### Winnard summary table
+
+```{r winnard_summary_table, echo = FALSE}
+winnard_age <- as.data.frame(bd_refined_gout  %>% 
+                           select(fam_winnard1, goutaff, f.21003.0.0 , f.31.0.0) %>% 
+                           filter(fam_winnard1 == 1, !is.na(goutaff), !is.na(f.21003.0.0)) %>% 
+                           mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                           group_by(cc) %>% 
+                           summarise(mean = mean(f.21003.0.0), sd = sd(f.21003.0.0)))
+
+winnard_bmi <-as.data.frame(bd_refined_gout  %>% 
+                          select(fam_winnard1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+                          filter(fam_winnard1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+                          mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                          group_by(cc) %>% 
+                          summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0) ))
+
+winnard_sex <- as.data.frame(bd_refined_gout  %>% 
+                           select(goutaff, f.31.0.0, fam_winnard1) %>% 
+                           filter(!is.na(goutaff), fam_winnard1 == 1 ) %>% 
+                           mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                           group_by(cc, sex)  %>% tally())
+winnard_eth_codes <- as.numeric(levels(factor(bd_refined_gout[!is.na(bd_refined_gout$fam_winnard1) & !is.na(bd_refined_gout$goutaff), "f.21000.0.0" ])))
+winnard_eth_case <- sapply(winnard_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_winnard1) & bd_refined_gout$goutaff == 1 & bd_refined_gout$f.21000.0.0 == x, ])})
+
+winnard_eth_control <- sapply(winnard_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_winnard1) & bd_refined_gout$goutaff == 0 & bd_refined_gout$f.21000.0.0 == x, ])})
+
+a <- data.frame(
+  # case = [,1], control = [,2]
+  n = c(winnard_tally[,"cases"], winnard_tally[,"controls"]),
+  Sex = c(round(winnard_sex[2,"n"]/ sum(winnard_sex[1:2, "n"]), digits = 2), round(winnard_sex[4,"n"]/ sum(winnard_sex[3:4, "n"]), digits = 2)),
+  Age = c(paste(round(winnard_age[1,2],digits =2), "+/-", round(winnard_age[1,3], digits = 2) , sep = " ") , paste(round(winnard_age[2,2],digits =2), "+/-", round(winnard_age[2,3], digits = 2) , sep = " ")),
+  Ethnicity = c(paste(winnard_eth_case, collapse = " "), paste(winnard_eth_control, collapse = " ")),
+  Diuretics = c(winnard_drug_tally[,"diuretics"] - winnard_drug_tally[,"diuretics_controls"], winnard_drug_tally[,"diuretics_controls"]),
+  Allopurinol = c(winnard_drug_tally[,"allopurinol"]- winnard_drug_tally[,"allopurinol_controls"], winnard_drug_tally[,"allopurinol_controls"]),
+  Febuxostat = c(winnard_drug_tally[,"febuxostat"] -winnard_drug_tally[,"febuxostat_controls"], winnard_drug_tally[,"febuxostat_controls"]),
+  Sulphinpyrazone = c(winnard_drug_tally[,"sulphinpyrazone"] -winnard_drug_tally[,"sulphinpyrazone_controls"], winnard_drug_tally[,"sulphinpyrazone_controls"]),
+  Colchicine = c(winnard_drug_tally[,"colchicine"] -winnard_drug_tally[,"colchicine_controls"] , winnard_drug_tally[,"colchicine_controls"]),
+  BMI = c(paste(round(winnard_bmi[1,2],digits =2), "+/-", round(winnard_bmi[1,3], digits = 2) , sep = " ") , paste(round(winnard_bmi[2,2],digits =2), "+/-", round(winnard_bmi[2,3], digits = 2) , sep = " "))
+)
+
+rownames(a) <-c("Gout", "Control")
+t(a)
+rm(a, winnard_age, winnard_sex)
+```
+Sex as % male  
+Age and BMI given as mean +/- sd  
+Ethnicity in order British, Irish, and Any other white background
+
+
+
+\pagebreak
+
+```{r hosp_gwas_stats, echo = FALSE}
+hosp_tally <- data.frame(
+  cases = as.numeric(bd_refined_gout  %>% filter(fam_hosp1 == 1 & goutaff == 1) %>% select(f.eid, fam_hosp1, gouthosp, goutaff) %>% tally()),
+  controls =as.numeric(bd_refined_gout  %>% filter(fam_hosp1 == 1 & goutaff == 0) %>% select(f.eid) %>% tally())
+)
+
+hosp_drug_tally <- data.frame(
+  allopurinol = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_hosp1 == 1)  %>% select(f.eid) %>% tally()),
+  allopurinol_controls = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_hosp1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  febuxostat = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_hosp1 == 1)  %>% select(f.eid) %>% tally()),
+  febuxostat_controls = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_hosp1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  colchicine = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_hosp1 == 1)  %>% select(f.eid) %>% tally()),
+  colchicine_controls = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_hosp1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_hosp1 == 1)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone_controls = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_hosp1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  colchicine_alone = as.numeric(bd_refined_gout  %>% 
+                                  filter(fam_hosp1 == 1 & colchicine ==1 & !(allopurinol == 1 | sulphinpyrazone == 1 | febuxostat == 1))  %>% 
+                                  select(f.eid) %>% tally()),
+  diuretics = as.numeric(bd_refined_gout  %>% filter(fam_hosp1 == 1 & diuretics == 1)  %>% select(f.eid) %>% tally()),
+  diuretics_controls = as.numeric(bd_refined_gout  %>% filter(fam_hosp1 == 1 & diuretics == 1 & goutaff ==0)  %>% select(f.eid) %>% tally())
+)
+```
+
+
+## Hospital
+
+For the GWAS based on hospital diagnosis gout criteria there were ```r hosp_tally[,"cases"]``` cases and ```r as.character(hosp_tally[,"controls"])``` controls, for a total sample size of ```r as.character(sum(hosp_tally[,c("cases","controls")]))```
+
+There were:
+
+- ```r as.character(hosp_drug_tally[, "diuretics"])``` people on diuretics
+
+- ```r hosp_drug_tally[,"allopurinol"]``` people taking allopurinol
+
+- ```r hosp_drug_tally[,"febuxostat"]``` people taking febuxostat
+
+- ```r hosp_drug_tally[, "sulphinpyrazone"]``` people taking sulphinpyrazone
+
+- ```r hosp_drug_tally[,"colchicine"]``` people taking cochicine
+
+
+
+```{r hosp_gwas_sex_plot, echo = FALSE}
+bd_refined_gout  %>% 
+  select(goutaff, f.31.0.0, fam_hosp1) %>% 
+  filter(!is.na(goutaff), fam_hosp1 == 1 ) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc, sex)  %>% tally()  %>% 
+  ggplot(., aes(x = sex, y = n)) + 
+  geom_bar(aes(fill =sex), stat = 'identity') +
+  geom_text(aes(label=n), vjust=-0.3, color="black",
+            position = position_dodge(0.9), size=3.5)+
+  facet_wrap(~cc) +
+  theme_bw() + 
+  theme(legend.position = "none") + 
+  ggtitle("Hospital Sex Distribution")
+```
+
+```{r hosp_gwas_bmi_plot, echo=FALSE, message=FALSE, warning=FALSE}
+bd_refined_gout  %>% 
+  select(fam_hosp1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+  filter(fam_hosp1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  ggplot(., aes(x = cc, y = f.21001.0.0)) + 
+  geom_boxplot() + xlab("Gout Affection") + 
+  ylab("BMI") + 
+  theme_bw() + 
+  facet_wrap(~sex) +
+  ggtitle("Hospital Gout Criteria")
+```
+
+BMI Summary:
+
+```{r, echo = FALSE}
+as.data.frame(bd_refined_gout  %>% 
+  select(fam_hosp1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+  filter(fam_hosp1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc) %>% 
+  summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0), min = min(f.21001.0.0),median = median(f.21001.0.0), max = max(f.21001.0.0) ), row.names = NULL)
+```
+
+### Hospital summary table
+
+```{r hosp_summary_table, echo = FALSE}
+hosp_age <- as.data.frame(bd_refined_gout  %>% 
+                           select(fam_hosp1, goutaff, f.21003.0.0 , f.31.0.0) %>% 
+                           filter(fam_hosp1 == 1, !is.na(goutaff), !is.na(f.21003.0.0)) %>% 
+                           mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                           group_by(cc) %>% 
+                           summarise(mean = mean(f.21003.0.0), sd = sd(f.21003.0.0)))
+
+hosp_bmi <-as.data.frame(bd_refined_gout  %>% 
+                          select(fam_hosp1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+                          filter(fam_hosp1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+                          mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                          group_by(cc) %>% 
+                          summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0) ))
+
+hosp_sex <- as.data.frame(bd_refined_gout  %>% 
+                           select(goutaff, f.31.0.0, fam_hosp1) %>% 
+                           filter(!is.na(goutaff), fam_hosp1 == 1 ) %>% 
+                           mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                           group_by(cc, sex)  %>% tally())
+
+hosp_eth_codes <- as.numeric(levels(factor(bd_refined_gout[!is.na(bd_refined_gout$fam_hosp1) & !is.na(bd_refined_gout$goutaff), "f.21000.0.0" ])))
+hosp_eth_case <- sapply(hosp_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_hosp1) & bd_refined_gout$goutaff == 1 & bd_refined_gout$f.21000.0.0 == x,])})
+
+hosp_eth_control <- sapply(hosp_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_hosp1) & bd_refined_gout$goutaff == 0 & bd_refined_gout$f.21000.0.0 == x, ])})
+
+a <- data.frame(
+  # case = [,1], control = [,2]
+  n = c(hosp_tally[,"cases"], hosp_tally[,"controls"]),
+  Sex = c(round(hosp_sex[2,"n"]/ sum(hosp_sex[1:2, "n"]), digits = 2), round(hosp_sex[4,"n"]/ sum(hosp_sex[3:4, "n"]), digits = 2)),
+  Age = c(paste(round(hosp_age[1,2],digits =2), "+/-", round(hosp_age[1,3], digits = 2) , sep = " ") , paste(round(hosp_age[2,2],digits =2), "+/-", round(hosp_age[2,3], digits = 2) , sep = " ")),
+  Ethnicity = c(paste(hosp_eth_case, collapse = " "), paste(hosp_eth_control, collapse = " ")),
+  Diuretics = c(hosp_drug_tally[,"diuretics"] - hosp_drug_tally[,"diuretics_controls"], hosp_drug_tally[,"diuretics_controls"]),
+  Allopurinol = c(hosp_drug_tally[,"allopurinol"]- hosp_drug_tally[,"allopurinol_controls"], hosp_drug_tally[,"allopurinol_controls"]),
+  Febuxostat = c(hosp_drug_tally[,"febuxostat"] -hosp_drug_tally[,"febuxostat_controls"], hosp_drug_tally[,"febuxostat_controls"]),
+  Sulphinpyrazone = c(hosp_drug_tally[,"sulphinpyrazone"] -hosp_drug_tally[,"sulphinpyrazone_controls"], hosp_drug_tally[,"sulphinpyrazone_controls"]),
+  Colchicine = c(hosp_drug_tally[,"colchicine"] -hosp_drug_tally[,"colchicine_controls"] , hosp_drug_tally[,"colchicine_controls"]),
+  BMI = c(paste(round(hosp_bmi[1,2],digits =2), "+/-", round(hosp_bmi[1,3], digits = 2) , sep = " ") , paste(round(hosp_bmi[2,2],digits =2), "+/-", round(hosp_bmi[2,3], digits = 2) , sep = " "))
+)
+
+rownames(a) <-c("Gout", "Control")
+t(a)
+rm(a, hosp_age, hosp_sex)
+
+```
+Sex as % male  
+Age and BMI given as mean +/- sd  
+Ethnicity in order British, Irish, and Any other white background
+
+
+
+\pagebreak
+
+```{r self_gwas_stats, echo = FALSE}
+self_tally <- data.frame(
+  cases = as.numeric(bd_refined_gout  %>% filter(fam_self1 == 1 & goutaff == 1) %>% select(f.eid, fam_self1, goutself, goutaff) %>% tally()),
+  controls =as.numeric(bd_refined_gout  %>% filter(fam_self1 == 1 & goutaff == 0) %>% select(f.eid) %>% tally())
+)
+
+self_drug_tally <- data.frame(
+  allopurinol = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_self1 == 1)  %>% select(f.eid) %>% tally()),
+  allopurinol_controls = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_self1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  febuxostat = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_self1 == 1)  %>% select(f.eid) %>% tally()),
+  febuxostat_controls = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_self1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  colchicine = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_self1 == 1)  %>% select(f.eid) %>% tally()),
+  colchicine_controls = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_self1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_self1 == 1)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone_controls = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_self1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  colchicine_alone = as.numeric(bd_refined_gout  %>% 
+                                  filter(fam_self1 == 1 & colchicine ==1 & !(allopurinol == 1 | sulphinpyrazone == 1 | febuxostat == 1))  %>% 
+                                  select(f.eid) %>% tally()),
+  diuretics = as.numeric(bd_refined_gout  %>% filter(fam_self1 == 1 & diuretics == 1)  %>% select(f.eid) %>% tally()),
+  diuretics_controls = as.numeric(bd_refined_gout  %>% filter(fam_self1 == 1 & diuretics == 1 & goutaff ==0)  %>% select(f.eid) %>% tally())
+)
+
+
+
+```
+
+
+## Self Reported
+
+For the GWAS based on self reported gout criteria there were ```r self_tally[,"cases"]``` cases and ```r as.character(self_tally[,"controls"])``` controls, for a total sample size of ```r as.character(sum(self_tally[,c("cases","controls")]))```
+
+There were:
+
+- ```r as.character(self_drug_tally[, "diuretics"])``` people on diuretics
+
+- ```r self_drug_tally[,"allopurinol"]``` people taking allopurinol
+
+- ```r self_drug_tally[,"febuxostat"]``` people taking febuxostat
+
+- ```r self_drug_tally[, "sulphinpyrazone"]``` people taking sulphinpyrazone
+
+- ```r self_drug_tally[,"colchicine"]``` people taking cochicine
+
+
+
+```{r self_gwas_sex_plot, echo = FALSE}
+bd_refined_gout  %>% 
+  select(goutaff, f.31.0.0, fam_self1) %>% 
+  filter(!is.na(goutaff), fam_self1 == 1 ) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc, sex)  %>% tally()  %>% 
+  ggplot(., aes(x = sex, y = n)) + 
+  geom_bar(aes(fill =sex), stat = 'identity') +
+  geom_text(aes(label=n), vjust=-0.3, color="black",
+            position = position_dodge(0.9), size=3.5)+
+  facet_wrap(~cc) +
+  theme_bw() + 
+  theme(legend.position = "none") + 
+  ggtitle("Self Report Sex Distribution")
+```
+
+```{r self_gwas_bmi_plot, echo=FALSE, message=FALSE, warning=FALSE}
+bd_refined_gout  %>% 
+  select(fam_self1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+  filter(fam_self1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  ggplot(., aes(x = cc, y = f.21001.0.0)) + 
+  geom_boxplot() + xlab("Gout Affection") + 
+  ylab("BMI") + 
+  theme_bw() + 
+  facet_wrap(~sex) +
+  ggtitle("Self Report Gout Criteria")
+```
+
+BMI Summary:
+
+```{r, echo = FALSE}
+as.data.frame(bd_refined_gout  %>% 
+  select(fam_self1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+  filter(fam_self1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc) %>% 
+  summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0), min = min(f.21001.0.0),median = median(f.21001.0.0), max = max(f.21001.0.0) ), row.names = NULL)
+```
+
+### Self report summary table
+
+```{r self_summary_table, echo = FALSE}
+self_age <- as.data.frame(bd_refined_gout  %>% 
+                           select(fam_self1, goutaff, f.21003.0.0 , f.31.0.0) %>% 
+                           filter(fam_self1 == 1, !is.na(goutaff), !is.na(f.21003.0.0)) %>% 
+                           mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                           group_by(cc) %>% 
+                           summarise(mean = mean(f.21003.0.0), sd = sd(f.21003.0.0)))
+
+self_bmi <-as.data.frame(bd_refined_gout  %>% 
+                          select(fam_self1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+                          filter(fam_self1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+                          mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                          group_by(cc) %>% 
+                          summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0) ))
+
+self_sex <- as.data.frame(bd_refined_gout  %>% 
+                           select(goutaff, f.31.0.0, fam_self1) %>% 
+                           filter(!is.na(goutaff), fam_self1 == 1 ) %>% 
+                           mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                           group_by(cc, sex)  %>% tally())
+
+self_eth_codes <- as.numeric(levels(factor(bd_refined_gout[!is.na(bd_refined_gout$fam_self1) & !is.na(bd_refined_gout$goutaff), "f.21000.0.0" ])))
+self_eth_case <- sapply(self_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_self1) & bd_refined_gout$goutaff == 1 & bd_refined_gout$f.21000.0.0 == x, ])})
+
+self_eth_control <- sapply(self_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_self1) & bd_refined_gout$goutaff == 0 & bd_refined_gout$f.21000.0.0 == x, ])})
+
+a <- data.frame(
+  # case = [,1], control = [,2]
+  n = c(self_tally[,"cases"], self_tally[,"controls"]),
+  Sex = c(round(self_sex[2,"n"]/ sum(self_sex[1:2, "n"]), digits = 2), round(self_sex[4,"n"]/ sum(self_sex[3:4, "n"]), digits = 2)),
+  Age = c(paste(round(self_age[1,2],digits =2), "+/-", round(self_age[1,3], digits = 2) , sep = " ") , paste(round(self_age[2,2],digits =2), "+/-", round(self_age[2,3], digits = 2) , sep = " ")),
+  Ethnicity = c(paste(self_eth_case, collapse = " "), paste(self_eth_control, collapse = " ")),
+  Diuretics = c(self_drug_tally[,"diuretics"] - self_drug_tally[,"diuretics_controls"], self_drug_tally[,"diuretics_controls"]),
+  Allopurinol = c(self_drug_tally[,"allopurinol"]- self_drug_tally[,"allopurinol_controls"], self_drug_tally[,"allopurinol_controls"]),
+  Febuxostat = c(self_drug_tally[,"febuxostat"] -self_drug_tally[,"febuxostat_controls"], self_drug_tally[,"febuxostat_controls"]),
+  Sulphinpyrazone = c(self_drug_tally[,"sulphinpyrazone"] -self_drug_tally[,"sulphinpyrazone_controls"], self_drug_tally[,"sulphinpyrazone_controls"]),
+  Colchicine = c(self_drug_tally[,"colchicine"] -self_drug_tally[,"colchicine_controls"] , self_drug_tally[,"colchicine_controls"]),
+  BMI = c(paste(round(self_bmi[1,2],digits =2), "+/-", round(self_bmi[1,3], digits = 2) , sep = " ") , paste(round(self_bmi[2,2],digits =2), "+/-", round(self_bmi[2,3], digits = 2) , sep = " "))
+)
+
+rownames(a) <-c("Gout", "Control")
+t(a)
+rm(a, self_age, self_sex)
+```
+Sex as % male  
+Age and BMI given as mean +/- sd  
+Ethnicity in order British, Irish, and Any other white background
+
+
+
+## Self Reported and ULT
+
+```{r self_ult_gwas_stats, echo = FALSE}
+self_ult_tally <- data.frame(
+  cases = as.numeric(bd_refined_gout  %>% filter(fam_self_ult1 == 1 & goutaff == 1) %>% select(f.eid, fam_self_ult1, goutself, goutaff) %>% tally()),
+  controls =as.numeric(bd_refined_gout  %>% filter(fam_self_ult1 == 1 & goutaff == 0) %>% select(f.eid) %>% tally())
+)
+
+self_ult_drug_tally <- data.frame(
+  allopurinol = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_self_ult1 == 1)  %>% select(f.eid) %>% tally()),
+  allopurinol_controls = as.numeric(bd_refined_gout  %>% filter(allopurinol == 1 & fam_self_ult1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  febuxostat = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_self_ult1 == 1)  %>% select(f.eid) %>% tally()),
+  febuxostat_controls = as.numeric(bd_refined_gout  %>% filter(febuxostat == 1 & fam_self_ult1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  colchicine = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_self_ult1 == 1)  %>% select(f.eid) %>% tally()),
+  colchicine_controls = as.numeric(bd_refined_gout  %>% filter(colchicine == 1 & fam_self_ult1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_self_ult1 == 1)  %>% select(f.eid) %>% tally()),
+  sulphinpyrazone_controls = as.numeric(bd_refined_gout  %>% filter(sulphinpyrazone == 1 & fam_self_ult1 == 1 & goutaff == 0)  %>% select(f.eid) %>% tally()),
+  colchicine_alone = as.numeric(bd_refined_gout  %>% 
+                                  filter(fam_self_ult1 == 1 & colchicine ==1 & !(allopurinol == 1 | sulphinpyrazone == 1 | febuxostat == 1))  %>% 
+                                  select(f.eid) %>% tally()),
+  diuretics = as.numeric(bd_refined_gout  %>% filter(fam_self_ult1 == 1 & diuretics == 1)  %>% select(f.eid) %>% tally()),
+  diuretics_controls = as.numeric(bd_refined_gout  %>% filter(fam_self_ult1 == 1 & diuretics == 1 & goutaff ==0)  %>% select(f.eid) %>% tally())
+)
+```
+
+For the GWAS based on self reported and ULT gout criteria there were ```r self_ult_tally[,"cases"]``` cases and ```r as.character(self_ult_tally[,"controls"])``` controls, for a total sample size of ```r as.character(sum(self_ult_tally[,c("cases","controls")]))```
+
+There were:
+  
+  - ```r as.character(self_ult_drug_tally[, "diuretics"])``` people on diuretics
+
+- ```r self_ult_drug_tally[,"allopurinol"]``` people taking allopurinol
+
+- ```r self_ult_drug_tally[,"febuxostat"]``` people taking febuxostat
+
+- ```r self_ult_drug_tally[, "sulphinpyrazone"]``` people taking sulphinpyrazone
+
+- ```r self_ult_drug_tally[,"colchicine"]``` people taking cochicine
+
+
+
+```{r self_ult_gwas_sex_plot, echo = FALSE}
+bd_refined_gout  %>% 
+  select(goutaff, f.31.0.0, fam_self_ult1) %>% 
+  filter(!is.na(goutaff), fam_self_ult1 == 1 ) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  group_by(cc, sex)  %>% tally()  %>% 
+  ggplot(., aes(x = sex, y = n)) + 
+  geom_bar(aes(fill =sex), stat = 'identity') +
+  geom_text(aes(label=n), vjust=-0.3, color="black",
+            position = position_dodge(0.9), size=3.5)+
+  facet_wrap(~cc) +
+  theme_bw() + 
+  theme(legend.position = "none") + 
+  ggtitle("Self Report and ULT Sex Distribution")
+```
+
+```{r self_ult_gwas_bmi_plot, echo=FALSE, message=FALSE, warning=FALSE}
+bd_refined_gout  %>% 
+  select(fam_self_ult1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+  filter(fam_self_ult1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  ggplot(., aes(x = cc, y = f.21001.0.0)) + 
+  geom_boxplot() + xlab("Gout Affection") + 
+  ylab("BMI") + 
+  theme_bw() + 
+  facet_wrap(~sex) +
+  ggtitle("Self Report and ULT Gout Criteria")
+```
+
+BMI Summary:
+  
+```{r, echo = FALSE}
+as.data.frame(bd_refined_gout  %>% 
+                select(fam_self_ult1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+                filter(fam_self_ult1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+                mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                group_by(cc) %>% 
+                summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0), min = min(f.21001.0.0),median = median(f.21001.0.0), max = max(f.21001.0.0) ), row.names = NULL)
+```
+
+### Self report and ULT summary table
+
+```{r self_ult_summary_table, echo = FALSE}
+self_ult_age <- as.data.frame(bd_refined_gout  %>% 
+                            select(fam_self_ult1, goutaff, f.21003.0.0 , f.31.0.0) %>% 
+                            filter(fam_self_ult1 == 1, !is.na(goutaff), !is.na(f.21003.0.0)) %>% 
+                            mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                            group_by(cc) %>% 
+                            summarise(mean = mean(f.21003.0.0), sd = sd(f.21003.0.0)))
+
+self_ult_bmi <-as.data.frame(bd_refined_gout  %>% 
+                           select(fam_self_ult1, goutaff, f.21001.0.0 , f.31.0.0) %>% 
+                           filter(fam_self_ult1 == 1, !is.na(goutaff), !is.na(f.21001.0.0)) %>% 
+                           mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                           group_by(cc) %>% 
+                           summarise(mean = mean(f.21001.0.0), sd = sd(f.21001.0.0) ))
+
+self_ult_sex <- as.data.frame(bd_refined_gout  %>% 
+                            select(goutaff, f.31.0.0, fam_self_ult1) %>% 
+                            filter(!is.na(goutaff), fam_self_ult1 == 1 ) %>% 
+                            mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)) , cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+                            group_by(cc, sex)  %>% tally())
+
+self_ult_eth_codes <- as.numeric(levels(factor(bd_refined_gout[!is.na(bd_refined_gout$fam_self_ult1) & !is.na(bd_refined_gout$goutaff), "f.21000.0.0" ])))
+self_ult_eth_case <- sapply(self_ult_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_self_ult1) & bd_refined_gout$goutaff == 1 & bd_refined_gout$f.21000.0.0 == x, ])})
+
+self_ult_eth_control <- sapply(self_ult_eth_codes ,function (x) {nrow(bd_refined_gout[!is.na(bd_refined_gout$fam_self_ult1) & bd_refined_gout$goutaff == 0 & bd_refined_gout$f.21000.0.0 == x, ])})
+
+a <- data.frame(
+  # case = [,1], control = [,2]
+  n = c(self_ult_tally[,"cases"], self_ult_tally[,"controls"]),
+  Sex = c(round(self_ult_sex[2,"n"]/ sum(self_ult_sex[1:2, "n"]), digits = 2), round(self_ult_sex[4,"n"]/ sum(self_ult_sex[3:4, "n"]), digits = 2)),
+  Age = c(paste(round(self_ult_age[1,2],digits =2), "+/-", round(self_ult_age[1,3], digits = 2) , sep = " ") , paste(round(self_ult_age[2,2],digits =2), "+/-", round(self_ult_age[2,3], digits = 2) , sep = " ")),
+  Ethnicity = c(paste(self_ult_eth_case, collapse = " "), paste(self_ult_eth_control, collapse = " ")),
+  Diuretics = c(self_ult_drug_tally[,"diuretics"] - self_ult_drug_tally[,"diuretics_controls"], self_ult_drug_tally[,"diuretics_controls"]),
+  Allopurinol = c(self_ult_drug_tally[,"allopurinol"]- self_ult_drug_tally[,"allopurinol_controls"], self_ult_drug_tally[,"allopurinol_controls"]),
+  Febuxostat = c(self_ult_drug_tally[,"febuxostat"] -self_ult_drug_tally[,"febuxostat_controls"], self_ult_drug_tally[,"febuxostat_controls"]),
+  Sulphinpyrazone = c(self_ult_drug_tally[,"sulphinpyrazone"] -self_ult_drug_tally[,"sulphinpyrazone_controls"], self_ult_drug_tally[,"sulphinpyrazone_controls"]),
+  Colchicine = c(self_ult_drug_tally[,"colchicine"] -self_ult_drug_tally[,"colchicine_controls"] , self_ult_drug_tally[,"colchicine_controls"]),
+  BMI = c(paste(round(self_ult_bmi[1,2],digits =2), "+/-", round(self_ult_bmi[1,3], digits = 2) , sep = " ") , paste(round(self_ult_bmi[2,2],digits =2), "+/-", round(self_ult_bmi[2,3], digits = 2) , sep = " "))
+)
+
+rownames(a) <-c("Gout", "Control")
+t(a)
+rm(a, self_ult_age, self_ult_sex)
+```
+
+Sex as % male  
+Age and BMI given as mean +/- sd  
+Ethnicity in order British, Irish, and Any other white background
+

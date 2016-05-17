@@ -1,0 +1,72 @@
+---
+title: "MurraySimulation"
+author: "Nick Burns"
+date: "19 April 2016"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+```
+
+All about class imbalance.
+
+```{r}
+simulate <- function (N, K) {
+
+    controls <- MASS::mvrnorm(n = N, c(1, 0.6, 2), matrix(c(1, 0.35, 0.4, 0.2, 1, 0.3, 0.4, 0.3, 1), nrow=3))
+    cases <- MASS::mvrnorm(n = K, c(4, -1, 2), matrix(c(1, -0.4, 0.25, 0.3, 1, 0.22, 0.25, 0.22, 1), nrow = 3))
+    
+    samples <- data.frame(rbind(controls, cases))
+    samples$CaseControl <- factor(c(rep(1, N), rep(2, K)))
+    
+    return (samples)
+}
+g <- ggplot(samples, aes(x = X1, y = X2, colour = CaseControl)) +
+    geom_point() +
+    theme_bw()
+```
+
+Model - prediction of CaseControl  
+
+```{r}
+visualiseBoundary <- function (N, K) {
+    
+    samples <- simulate(N, K)
+    model <- glm(CaseControl ~ X1 + X2, data = samples, family = binomial)
+    summary(model)
+    
+    print(coef(model))
+    
+    slope <- coef(model)[2] / (-coef(model)[3])
+    intercept <- coef(model)[1] / (-coef(model)[3])
+    g <- ggplot(samples, aes (X1, X2, colour = CaseControl)) + geom_point() + 
+        geom_abline(slope = slope, intercept = intercept) + theme_bw()
+    
+    return (g)
+}
+
+```
+
+
+```{r}
+visualiseBoundary(150000, 2500)
+```
+
+## Genetic risk score  
+
+```{r}
+getScore <- function (data) {
+    prcomp(data)$x[, 1]
+}
+samples <- simulate(7500, 2550)
+
+samples$risk <- getScore(samples[, c("X1", "X2", "X3")])
+summary(model <- glm(risk ~ X1 + X2 + X3, data = samples, family = "gaussian"))
+
+slope <- coef(model)[2] / (-coef(model)[3])
+intercept <- coef(model)[1] / (-coef(model)[3])
+g <- ggplot(samples, aes (X1, X2, colour = CaseControl)) + geom_point() + 
+    geom_abline(slope = slope, intercept = intercept) + theme_bw()
+g
+```

@@ -1,0 +1,74 @@
+---
+title: "Untitled"
+author: ""
+date: "`r format(Sys.Date())`"
+output: html_document
+---
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+data_dir <- "/run/user/1000/gvfs/smb-share:server=biocldap,share=staff_groups/merrimanlab/Documents/Murray/ukbiobank_util/data/"
+scratch_dir <- "/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/"
+load(paste0(data_dir,'ukbiobank_genotyped2016-04-26.RData'))
+all_fam <- read.table("/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/chr1impv1.fam", header=FALSE)
+colnames(all_fam) <- c("FID","IID","PID","MID", "SEX","AFF")
+```
+
+```{r, echo=FALSE}
+gout_patients <- genotyped %>% select(f.eid, goutaff, goutult, goutself, gouthosp, goutall, gout_exclude_drug, goutwinnard, renaldisease, f.21000.0.0)  %>% filter(goutaff == 1)
+
+
+
+# A
+only_self <- gout_patients  %>% filter(goutself == 1 & is.na(goutult) & is.na(gouthosp)) %>% select(f.eid) %>% tally()
+
+# B
+only_hosp <- gout_patients  %>% filter(gouthosp == 1 & is.na(goutult) & is.na(goutself)) %>% select(f.eid) %>% tally()
+
+# C
+only_ult <- gout_patients  %>% filter(goutult == 1 & is.na(gouthosp) & is.na(goutself)) %>% select(f.eid) %>% tally()
+
+# D
+union_hosp_ult <- gout_patients  %>% filter(gouthosp == 1 & goutult == 1 & is.na(goutself)) %>% select(f.eid) %>% tally()
+
+# E
+union_hosp_self <- gout_patients  %>% filter(gouthosp == 1 & goutself == 1 & is.na(goutult)) %>% select(f.eid) %>% tally()
+
+# F
+union_ult_self <- gout_patients  %>% filter(goutself == 1 & goutult == 1 & is.na(gouthosp)) %>% select(f.eid) %>% tally()
+
+# G
+union_hosp_ult_self <- gout_patients  %>% filter(gouthosp == 1 & goutult == 1 & goutself == 1) %>% select(f.eid) %>% tally()
+```
+
+
+## Total UK Biobank Gout Patients
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(VennDiagram)
+gout_patients$f.eid <-  as.numeric(gout_patients$f.eid)
+ult <- gout_patients  %>%  filter(goutult == 1 & f.21000.0.0 %in% c(1001,1002,1003))  %>% select(f.eid)
+self <- gout_patients  %>%  filter(goutself == 1 & f.21000.0.0 %in% c(1001,1002,1003))  %>% select(f.eid)
+hosp <- gout_patients  %>%  filter(gouthosp == 1 & f.21000.0.0 %in% c(1001,1002,1003))  %>% select(f.eid)
+winnard <- gout_patients  %>%  filter(goutwinnard == 1 & f.21000.0.0 %in% c(1001,1002,1003))  %>% select(f.eid)
+
+venn.diagram(list(Hospital=hosp[,1], "Self-Reported" = self[,1], Winnard = winnard[,1], ULT = ult[,1]), fill = c('#FFFF80','#AAFFAA','#FFAAAA','#AAAAFF'), filename = "total_venn.tiff")
+
+```
+
+![Total UK Biobank Gout Patients](total_venn.tiff)
+
+## Genotyped UK Biobank Patients
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results=FALSE}
+gout_patients$f.eid <-  as.numeric(gout_patients$f.eid)
+ult <- gout_patients  %>%  filter(goutult == 1 & f.eid %in% all_fam$IID & f.21000.0.0 %in% c(1001,1002,1003) )  %>% select(f.eid)
+self <- gout_patients  %>%  filter(goutself == 1 & f.eid %in% all_fam$IID & f.21000.0.0 %in% c(1001,1002,1003))  %>% select(f.eid)
+hosp <- gout_patients  %>%  filter(gouthosp == 1 & f.eid %in% all_fam$IID & f.21000.0.0 %in% c(1001,1002,1003))  %>% select(f.eid)
+winnard <- gout_patients  %>%  filter(goutwinnard == 1 & f.eid %in% all_fam$IID & f.21000.0.0 %in% c(1001,1002,1003))  %>% select(f.eid)
+
+venn.diagram(list(Hospital=hosp[,1], "Self-Reported" = self[,1], Winnard = winnard[,1], ULT = ult[,1]),fill = c('#FFFF80','#AAFFAA','#FFAAAA','#AAAAFF') ,filename = "genotyped_venn.tiff")
+
+```
+
+![Genotyped UK Biobank Gout Patients](genotyped_venn.tiff)
