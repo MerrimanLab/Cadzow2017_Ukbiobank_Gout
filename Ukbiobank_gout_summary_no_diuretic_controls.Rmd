@@ -3,8 +3,8 @@ title: "UkBioBank Gout Summary Report - No Diuretic Controls"
 author: "Murray Cadzow"
 date: '`r format(Sys.Date())`'
 output:
-  pdf_document:
-  toc: yes
+  #pdf_document:
+  #toc: yes
 html_document:
   toc: yes
 ---
@@ -12,11 +12,12 @@ html_document:
 ```{r load data,echo = FALSE}
 library(dplyr)
 library(ggplot2)
+library(pander)
 library(data.table)
 data_dir <- "/run/user/1000/gvfs/smb-share:server=biocldap,share=staff_groups/merrimanlab/Documents/Murray/ukbiobank_util/data/"
 scratch_dir <- "/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/"
 load(paste0(data_dir,'ukbiobank_genotyped2016-04-26.RData'))
-
+genotyped$waist_height_ratio <- genotyped$f.48.0.0 / genotyped$f.50.0.0
 source("create_kottgen_table1.R")
 source('read_fams.R')
 control_cond <- 'controls_no_diuretics'
@@ -132,6 +133,21 @@ genotyped  %>%
   facet_wrap(~sex) +
   ggtitle("All Gout Criteria")
 ```
+
+```{r all_gwas_wh_plot, echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+genotyped  %>% 
+  select(fam_all, goutaff, waist_height_ratio , f.31.0.0) %>% 
+  filter(fam_all == 1, !is.na(goutaff), !is.na(waist_height_ratio)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  ggplot(., aes(x = cc, y = waist_height_ratio)) + 
+  geom_boxplot() + xlab("Gout Affection") + 
+  ylab("Waist to Height Ratio") + 
+  theme_bw() + 
+  facet_wrap(~sex) +
+  ggtitle("All Gout Criteria")
+```
+
+
 
 BMI Summary:
   
@@ -336,8 +352,8 @@ Ethnicity in order British, Irish, and Any other white background
 
 ```{r, echo = FALSE}
 gout_cond <- 'hosp'
-create_kottgen_table1(kottgen_loci =paste0(scratch_dir,"GWAS_all_controls/",control_cond,'/',gout_cond,'/adjusted/kottgen_results.txt'))
-
+hosp_kot <- create_kottgen_table1(kottgen_loci =paste0(scratch_dir,"GWAS_all_controls/",control_cond,'/',gout_cond,'/adjusted/kottgen_results.txt'))
+print(hosp_kot[['sum_table']])
 ```
 
 \pagebreak
@@ -508,4 +524,39 @@ Ethnicity in order British, Irish, and Any other white background
 gout_cond <- 'self_ult'
 self_ult_kot <- create_kottgen_table1(kottgen_loci =paste0(scratch_dir,"GWAS_all_controls/",control_cond,'/',gout_cond,'/adjusted/kottgen_results.txt'))
 print(self_ult_kot[['sum_table']])
+```
+
+```{r, echo = FALSE, results = 'asis'}
+kottgen_table1 <- list(all =all_kot[['sum_table']], winnard = winnard_kot[['sum_table']], hosp = hosp_kot[['sum_table']], self = self_kot[['sum_table']], self_ult = self_ult_kot[['sum_table']]) 
+for (name in names(kottgen_table1)){
+  kottgen_table1[[name]]$gout <-  name
+}
+kt1 <- do.call(rbind, kottgen_table1)
+kt1 <-kt1[order(kt1$SNP), ! colnames(kt1) %in% c('sort')]
+row.names(kt1) <- NULL
+pandoc.table(kt1[,], caption = 'Combined Kottgen Table 1 All Gout Classifications' )
+```
+
+```{r, echo = FALSE, fig.align='centre', fig.width= 8, fig.height=8}
+ggplot(data = kt1, aes(x = gout, y = OR, colour = gout)) + geom_point() + facet_wrap(~SNP, scales = 'free_y') + geom_linerange(aes(x = gout, ymin = lower95, ymax = upper95)) +geom_hline(yintercept = 1) +theme_bw() + theme(axis.text.x = element_blank()) 
+
+```
+
+
+```{r, echo = FALSE, fig.align='centre', fig.width= 8, fig.height=8}
+kt1_sig <- kt1[kt1$SNP %in% kt1[kt1$P < 1e-8, 'SNP'] , ]
+kt1_sig$label <- paste("Chr",kt1_sig$CHR,'-', kt1_sig$grail_gene)
+ggplot(data = kt1_sig, aes(x = gout, y = OR, colour = gout)) + geom_point() + facet_wrap(~label, scales = 'free_y') + geom_linerange(aes(x = gout, ymin = lower95, ymax = upper95)) +geom_hline(yintercept = 1) +theme_bw() + theme(axis.text.x = element_blank() + axis.ticks.x = element_blank()) 
+
+```
+
+```{r}
+phipps <- data.frame(SNP =c('rs12498742','rs1260326', 'rs2231142', 'rs478607'), CHR =c(4,2,4, 11), BP =c( 9944052,27730940,89052323, 64478063), grail_gene = c('SLC2A9 ','GCKR ', 'ABCG2 ', 'SLC22A12 '), OR = c( 1/1.959, 1.314, 2.008, 1.239), lower95 = c( 1/1.615, 1.144, 1.681, 1.064), upper95 =c( 1/2.375, 1.509, 2.400, 1.444), P =c( 7.9e-12, 1.1e-4, 1.7e-14, 0.006))
+phipps$SE <- NA
+phipps$gout <- 'Phipps-Green et al 2016'
+kt1_sig <- kt1[kt1$SNP %in% kt1[kt1$P < 1e-8, 'SNP'] , ]
+kt1_sig <- rbind(kt1_sig, phipps)
+kt1_sig$label <- paste("Chr",kt1_sig$CHR,'-', kt1_sig$grail_gene)
+
+ggplot(data = kt1_sig, aes(x = gout, y = OR, colour = gout)) + geom_point() + facet_wrap(~label, scales = 'free_y') + geom_linerange(aes(x = gout, ymin = lower95, ymax = upper95)) +geom_hline(yintercept = 1) +theme_bw() + theme(axis.text.x = element_blank()) 
 ```

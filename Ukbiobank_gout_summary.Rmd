@@ -4,9 +4,9 @@ author: "Murray Cadzow"
 date: '`r format(Sys.Date())`'
 output:
   pdf_document:
-    toc: yes
-    includes:
-      in_header: header.tex
+   # toc: yes
+   # includes:
+   #   in_header: header.tex
   html_document:
     toc: yes
 ---
@@ -23,6 +23,7 @@ scratch_dir <- "/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merr
 control_cond <- 'controls' 
 
 load(paste0(data_dir,"ukbiobank_genotyped2016-04-26.RData"))
+genotyped$waist_height_ratio <- genotyped$f.48.0.0 / genotyped$f.50.0.0
 
 source("create_kottgen_table1.R")
 source('read_fams.R')
@@ -134,6 +135,19 @@ genotyped  %>%
   ggplot(., aes(x = cc, y = f.21001.0.0)) + 
   geom_boxplot() + xlab("Gout Affection") + 
   ylab("BMI") + 
+  theme_bw() + 
+  facet_wrap(~sex) +
+  ggtitle("All Gout Criteria")
+```
+
+```{r all_gwas_wh_plot, echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+genotyped  %>% 
+  select(fam_all, goutaff, waist_height_ratio , f.31.0.0) %>% 
+  filter(fam_all == 1, !is.na(goutaff), !is.na(waist_height_ratio)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  ggplot(., aes(x = cc, y = waist_height_ratio)) + 
+  geom_boxplot() + xlab("Gout Affection") + 
+  ylab("Waist to Height Ratio") + 
   theme_bw() + 
   facet_wrap(~sex) +
   ggtitle("All Gout Criteria")
