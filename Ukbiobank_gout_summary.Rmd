@@ -548,7 +548,7 @@ kot_t1_gout$upper95 <- NA
 kot_t1_gout$SE <- NA
 ```
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, message=FALSE}
 library(RMySQL)
 library(data.table)
 library(dplyr)
