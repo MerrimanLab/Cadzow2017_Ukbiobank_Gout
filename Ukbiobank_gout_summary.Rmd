@@ -3,14 +3,11 @@ title: "UkBioBank Gout Summary Report"
 author: "Murray Cadzow"
 date: '`r format(Sys.Date())`'
 output:
-  pdf_document:
+  pdf_document: 
     toc: yes
     includes:
       in_header: header.tex
-  html_document:
-    toc: yes
 ---
-
 \listoftables
 
 ```{r load data,echo = FALSE, message=FALSE, warning=FALSE}
@@ -18,11 +15,12 @@ library(dplyr)
 library(ggplot2)
 library(pander)
 # read in fam file for sample filtered plink files
-data_dir <- "/run/user/1000/gvfs/smb-share:server=biocldap,share=staff_groups/merrimanlab/Documents/Murray/ukbiobank_util/data/"
-scratch_dir <- "/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/"
+data_dir <- "/media/xsan/staff_groups/merrimanlab/Documents/Murray/ukbiobank_util/data/"
+scratch_dir <- "/media/xsan/scratch/merrimanlab/murray/working_dir/UkBio/"
 control_cond <- 'controls' 
 
 load(paste0(data_dir,"ukbiobank_genotyped2016-04-26.RData"))
+genotyped$waist_height_ratio <- genotyped$f.48.0.0 / genotyped$f.50.0.0
 
 source("create_kottgen_table1.R")
 source('read_fams.R')
@@ -139,6 +137,19 @@ genotyped  %>%
   ggtitle("All Gout Criteria")
 ```
 
+```{r all_gwas_wh_plot, echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+genotyped  %>% 
+  select(fam_all, goutaff, waist_height_ratio , f.31.0.0) %>% 
+  filter(fam_all == 1, !is.na(goutaff), !is.na(waist_height_ratio)) %>% 
+  mutate(sex = ifelse(f.31.0.0 == 0, "Female", ifelse(f.31.0.0 == 1, "Male",NA)), cc = ifelse(goutaff == 1, "Case", "Control")) %>% 
+  ggplot(., aes(x = cc, y = waist_height_ratio)) + 
+  geom_boxplot() + xlab("Gout Affection") + 
+  ylab("Waist to Height Ratio") + 
+  theme_bw() + 
+  facet_wrap(~sex) +
+  ggtitle("All Gout Criteria")
+```
+
 BMI Summary:
 
 ```{r, echo = FALSE, eval = FALSE}
@@ -168,8 +179,8 @@ Ethnicity in order British, Irish, and Any other white background
 ```{r, echo = FALSE, results='asis'}
 gout_cond <- 'all'
 all_kot <- create_kottgen_table1(kottgen_loci =paste0(scratch_dir,"GWAS_all_controls/",control_cond,'/',gout_cond,'/adjusted/kottgen_results.txt'))
-
-pandoc.table(all_kot[['sum_table']], caption = 'Kottgen table 1 SNPs - All')
+row.names(all_kot[['sum_table']]) <- NULL
+pandoc.table(as.data.frame(all_kot[['sum_table']][c('SNP','CHR','BP', "grail_gene","OR","lower95","upper95","P")], row.names = NULL), caption = 'Kottgen table 1 SNPs - All')
 
 ```
 
@@ -257,7 +268,8 @@ Ethnicity in order British, Irish, and Any other white background
 ```{r, echo = FALSE, results = 'asis'}
 gout_cond <- 'winnard'
 winnard_kot <- create_kottgen_table1(kottgen_loci =paste0(scratch_dir,"GWAS_all_controls/",control_cond,'/',gout_cond,'/adjusted/kottgen_results.txt'))
-pandoc.table(winnard_kot[['sum_table']])
+row.names(winnard_kot[['sum_table']]) <- NULL
+pandoc.table(winnard_kot[['sum_table']][c('SNP','CHR','BP', "grail_gene","OR","lower95","upper95","P")])
 
 ```
 
@@ -344,7 +356,8 @@ Ethnicity in order British, Irish, and Any other white background
 ```{r, echo = FALSE, results = 'asis'}
 gout_cond <- 'hosp'
 hosp_kot <- create_kottgen_table1(kottgen_loci =paste0(scratch_dir,"GWAS_all_controls/",control_cond,'/',gout_cond,'/adjusted/kottgen_results.txt'))
-pandoc.table(hosp_kot[['sum_table']])
+row.names(hosp_kot[['sum_table']]) <- NULL
+pandoc.table(hosp_kot[['sum_table']][c('SNP','CHR','BP', "grail_gene","OR","lower95","upper95","P")])
 
 ```
 
@@ -433,7 +446,8 @@ Ethnicity in order British, Irish, and Any other white background
 ```{r, echo = FALSE, results = 'asis'}
 gout_cond <- 'self'
 self_kot <- create_kottgen_table1(kottgen_loci =paste0(scratch_dir,"GWAS_all_controls/",control_cond,'/',gout_cond,'/adjusted/kottgen_results.txt'))
-pandoc.table(self_kot[['sum_table']])
+row.names(self_kot[['sum_table']]) <- NULL
+pandoc.table(self_kot[['sum_table']][c('SNP','CHR','BP', "grail_gene","OR","lower95","upper95","P")])
 ```
 
 ## Self Reported and ULT
@@ -516,24 +530,53 @@ Ethnicity in order British, Irish, and Any other white background
 ```{r, echo = FALSE, results = 'asis'}
 sgout_cond <- 'self_ult'
 self_ult_kot <- create_kottgen_table1(kottgen_loci =paste0(scratch_dir,"GWAS_all_controls/",control_cond,'/',gout_cond,'/adjusted/kottgen_results.txt'))
-pandoc.table(self_ult_kot[['sum_table']])
+row.names(self_ult_kot[['sum_table']]) <- NULL
+pandoc.table(self_ult_kot[['sum_table']][c('SNP','CHR','BP', "grail_gene","OR","lower95","upper95","P")])
 ```
 
 \newpage
 \blandscape
 
+
+
 ```{r, echo = FALSE, results = 'asis'}
-kottgen_table1 <- list(all =all_kot[['sum_table']], winnard = winnard_kot[['sum_table']], hosp = hosp_kot[['sum_table']], self = self_kot[['sum_table']], self_ult = self_ult_kot[['sum_table']]) 
+kot_t1 <- read.csv("kottgen_table1.csv", header = TRUE, stringsAsFactors = FALSE)
+kot_t1_gout <- kot_t1[,c("SNP","CHR","BP","grail_gene","OR","gout_pvalue", "A1", "A2")]
+names(kot_t1_gout) <- c("SNP","CHR","BP","grail_gene","OR","P", "A1","A2")
+kot_t1_gout$lower95 <- NA
+kot_t1_gout$upper95 <- NA
+kot_t1_gout$SE <- NA
+```
+
+```{r, echo = FALSE, message=FALSE}
+library(RMySQL)
+library(data.table)
+library(dplyr)
+drv = dbDriver("MySQL")
+db = dbConnect(drv, default.file = '~/.my.cnf', dbname="merrimanDW_test")
+
+ukvariant <- dbGetQuery(db, paste('select * from dimVariant where snp in (', paste(paste0("'",kot_t1$SNP,"'"), collapse = ','),")"))
+```
+
+
+
+```{r, echo=FALSE, results = 'asis'}
+kottgen_table1 <- list(all =merge(all_kot[['sum_table']], ukvariant[,c("snp","A1","A2")],by.x = "SNP", by.y = "snp", all.x = TRUE), winnard = merge(winnard_kot[['sum_table']], ukvariant[,c("snp","A1","A2")],by.x = "SNP", by.y = "snp", all.x = TRUE), hosp = merge(hosp_kot[['sum_table']], ukvariant[,c("snp","A1","A2")],by.x = "SNP", by.y = "snp", all.x = TRUE), self = merge(self_kot[['sum_table']], ukvariant[,c("snp","A1","A2")],by.x = "SNP", by.y = "snp", all.x = TRUE), self_ult = merge(self_ult_kot[['sum_table']], ukvariant[,c("snp","A1","A2")],by.x = "SNP", by.y = "snp", all.x = TRUE), kottgen_gout = kot_t1_gout) 
 for (name in names(kottgen_table1)){
   kottgen_table1[[name]]$gout <-  name
 }
+
+
+
 kt1 <- do.call(rbind, kottgen_table1)
 kt1 <-kt1[order(kt1$SNP), ! colnames(kt1) %in% c('sort')]
 row.names(kt1) <- NULL
-pandoc.table(kt1[,], caption = 'Combined Kottgen Table 1 All Gout Classifications' )
+#pandoc.table(kt1[,c('SNP','CHR','BP', "grail_gene","OR","lower95","upper95","P","gout")], caption = 'Combined Kottgen Table 1 All Gout Classifications' )
+pandoc.table(kt1[,c('SNP','CHR','BP',"A1","A2", "grail_gene","OR","P","gout")], caption = 'Combined Kottgen Table 1 All Gout Classifications' )
 ```
 
 \elandscape
+
 \newpage
 
 ```{r, echo = FALSE, fig.align='centre', fig.width= 8, fig.height=8}
@@ -542,7 +585,7 @@ ggplot(data = kt1, aes(x = gout, y = OR)) + geom_point() + facet_wrap(~SNP, scal
 ```
 
 
-```{r, echo = FALSE, fig.width=8, fig.height=8}
+```{r, echo = FALSE, fig.width=8, fig.height=8, eval = FALSE}
 dat_kottgen_table1 <- list(all =all_kot[['dat']], winnard = winnard_kot[['dat']], hosp = hosp_kot[['dat']], self = self_kot[['dat']], self_ult = self_ult_kot[['dat']]) 
 for (name in names(dat_kottgen_table1)){
   dat_kottgen_table1[[name]]$gout <-  name

@@ -7,10 +7,11 @@ output: html_document
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 library(dplyr)
-data_dir <- "/run/user/1000/gvfs/smb-share:server=biocldap,share=staff_groups/merrimanlab/Documents/Murray/ukbiobank_util/data/"
-scratch_dir <- "/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/"
+xsan <- '/media/xsan/'
+data_dir <- paste0(xsan,"/staff_groups/merrimanlab/Documents/Murray/ukbiobank_util/data/")
+scratch_dir <- paste0(xsan,"/scratch/merrimanlab/murray/working_dir/UkBio/")
 load(paste0(data_dir,'ukbiobank_genotyped2016-04-26.RData'))
-all_fam <- read.table("/run/user/1000/gvfs/smb-share:server=biocldap,share=scratch/merrimanlab/murray/working_dir/UkBio/chr1impv1.fam", header=FALSE)
+all_fam <- read.table(paste0(scratch_dir,"chr1impv1.fam"), header=FALSE)
 colnames(all_fam) <- c("FID","IID","PID","MID", "SEX","AFF")
 ```
 
@@ -72,3 +73,4 @@ venn.diagram(list(Hospital=hosp[,1], "Self-Reported" = self[,1], Winnard = winna
 ```
 
 ![Genotyped UK Biobank Gout Patients](genotyped_venn.tiff)
+
